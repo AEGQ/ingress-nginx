@@ -845,6 +845,7 @@ type TemplateConfig struct {
 	PublishService           *apiv1.Service
 	EnableMetrics            bool
 	MaxmindEditionFiles      []string
+	DynamicServersEnabled    bool
 
 	PID        string
 	StatusPath string

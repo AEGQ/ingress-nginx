@@ -239,6 +239,8 @@ type Location struct {
 	Ingress *Ingress `json:"ingress"`
 	// Backend describes the name of the backend to use.
 	Backend string `json:"backend"`
+	// LuaBackend describes the details of the backend to use.
+	LuaBackend LuaBackend `json:"luaBackend"`	
 	// Service describes the referenced services from the ingress
 	Service *apiv1.Service `json:"-"`
 	// Port describes to which port from the service
@@ -393,4 +395,11 @@ type Ingress struct {
 // GeneralConfig holds the definition of lua general configuration data
 type GeneralConfig struct {
 	ControllerPodsCount int `json:"controllerPodsCount"`
+}
+
+type LuaBackend struct {
+	Namespace   string `json:"namespace"`
+	IngressName string `json:"ingressName"`
+	ServiceName string `json:"serviceName"`
+	ServicePort string `json:"servicePort"`
 }

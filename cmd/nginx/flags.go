@@ -170,6 +170,8 @@ Takes the form "<host>:port". If not provided, no admission controller is starte
 		profilerPort = flags.Int("profiler-port", 10245, "Port to use for expose the ingress controller Go profiler when it is enabled.")
 
 		statusUpdateInterval = flags.Int("status-update-interval", status.UpdateInterval, "Time interval in seconds in which the status should check if an update is required. Default is 60 seconds")
+
+		dynamicServersEnabled = flags.Bool("enable-dynamic-servers", false, `Dynamically update servers instead of reloading NGINX. Feature backed by OpenResty Lua libraries.`)		
 	)
 
 	flags.StringVar(&nginx.MaxmindLicenseKey, "maxmind-license-key", "", `Maxmind license key to download GeoLite2 Databases.
@@ -293,6 +295,7 @@ https://blog.maxmind.com/2019/12/18/significant-changes-to-accessing-and-using-g
 		ValidationWebhook:         *validationWebhook,
 		ValidationWebhookCertPath: *validationWebhookCert,
 		ValidationWebhookKeyPath:  *validationWebhookKey,
+		DynamicServersEnabled:     *dynamicServersEnabled,
 	}
 
 	if *apiserverHost != "" {

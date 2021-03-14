@@ -608,6 +608,7 @@ func (n NGINXController) generateTemplate(cfg ngx_config.Configuration, ingressC
 		ListenPorts:              n.cfg.ListenPorts,
 		PublishService:           n.GetPublishService(),
 		EnableMetrics:            n.cfg.EnableMetrics,
+		DynamicServersEnabled:    n.cfg.DynamicServersEnabled,
 		MaxmindEditionFiles:      n.cfg.MaxmindEditionFiles,
 		HealthzURI:               nginx.HealthPath,
 		PID:                      nginx.PID,
@@ -849,12 +850,17 @@ func (n *NGINXController) IsDynamicConfigurationEnough(pcfg *ingress.Configurati
 	clearCertificates(&copyOfRunningConfig)
 	clearCertificates(&copyOfPcfg)
 
+	if n.cfg.DynamicServersEnabled {
+		copyOfRunningConfig.Servers = []*ingress.Server{}
+		copyOfPcfg.Servers = []*ingress.Server{}
+	}
+
 	return copyOfRunningConfig.Equal(&copyOfPcfg)
 }
 
 // configureDynamically encodes new Backends in JSON format and POSTs the
 // payload to an internal HTTP endpoint handled by Lua.
-func (n *NGINXController) configureDynamically(pcfg *ingress.Configuration) error {
+func (n *NGINXController) configureDynamically(pcfg *ingress.Configuration, isDynamicServersEnabled bool) error {
 	backendsChanged := !reflect.DeepEqual(n.runningConfig.Backends, pcfg.Backends)
 	if backendsChanged {
 		err := configureBackends(pcfg.Backends)
@@ -890,6 +896,13 @@ func (n *NGINXController) configureDynamically(pcfg *ingress.Configuration) erro
 			return err
 		}
 	}
+
+	if isDynamicServersEnabled {
+		err := configureServers(pcfg)
+		if err != nil {
+			return err
+		}
+	}	
 
 	return nil
 }
@@ -1038,6 +1051,50 @@ func configureCertificates(rawServers []*ingress.Server) error {
 	}
 
 	statusCode, _, err := nginx.NewPostStatusRequest("/configuration/servers", "application/json", configuration)
+	if err != nil {
+		return err
+	}
+
+	if statusCode != http.StatusCreated {
+		return fmt.Errorf("unexpected error code: %d", statusCode)
+	}
+
+	return nil
+}
+
+// configureServers send POST request to update lua vservers
+func configureServers(pcfg *ingress.Configuration) error {
+	var servers []*ingress.Server
+
+	for _, server := range pcfg.Servers {
+		var locations []*ingress.Location
+		for _, location := range server.Locations {
+			luaBackend := ingress.LuaBackend{}
+			if location.Ingress != nil {
+				luaBackend.Namespace = location.Ingress.Namespace
+				luaBackend.IngressName = location.Ingress.Name
+				luaBackend.ServiceName, luaBackend.ServicePort = splitUpstreamName(
+					location.Backend, luaBackend.Namespace)
+			}
+
+			locations = append(locations, &ingress.Location{
+				Path:       location.Path,
+				Backend:    location.Backend,
+				LuaBackend: luaBackend,
+				Rewrite:    location.Rewrite,
+				Redirect:   location.Redirect,
+				Whitelist:  location.Whitelist,
+			})
+		}
+
+		servers = append(servers, &ingress.Server{
+			Hostname:  server.Hostname,
+			Locations: locations,
+			Aliases:   server.Aliases,
+		})
+	}
+
+	statusCode, _, err := nginx.NewPostStatusRequest("/configuration/vservers", "application/json", servers)
 	if err != nil {
 		return err
 	}

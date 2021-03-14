@@ -101,6 +101,8 @@ type Configuration struct {
 
 	GlobalExternalAuth  *ngx_config.GlobalExternalAuth
 	MaxmindEditionFiles []string
+
+	DynamicServersEnabled bool
 }
 
 // GetPublishService returns the Service used to set the load-balancer status of Ingresses.
@@ -173,7 +175,7 @@ func (n *NGINXController) syncIngress(interface{}) error {
 	}
 
 	err := wait.ExponentialBackoff(retry, func() (bool, error) {
-		err := n.configureDynamically(pcfg)
+		err := n.configureDynamically(pcfg, n.cfg.DynamicServersEnabled)
 		if err == nil {
 			klog.V(2).Infof("Dynamic reconfiguration succeeded.")
 			return true, nil
